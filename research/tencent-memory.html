@@ -435,7 +435,7 @@
     "2": {
       title:"L2 · Scenario（场景）",
       role:"中上层 · 半结构 · 主题聚合",
-      desc:"把相关原子事实聚合成一个个"场景块"。例如「2025-Q2 产品设计讨论」。",
+      desc:"把相关原子事实聚合成一个个『场景块』。例如「2025-Q2 产品设计讨论」。",
       ex:"scenarios/*.md"
     },
     "1": {
@@ -501,19 +501,22 @@
     el.textContent = (target < 0 ? "−" : "+") + "0" + suffix;
     requestAnimationFrame(tick);
   }
-  // Run on view
-  const io = new IntersectionObserver(entries => {
-    entries.forEach(e => {
-      if (e.isIntersecting){
-        const vals = document.querySelectorAll(".metric .val");
-        animateMetric(vals[0], -61.38, "%");
-        animateMetric(vals[1], 51.52, "%");
-        // 第三个是 48% → 76%，保留原文
-        io.disconnect();
-      }
-    });
-  }, {threshold:.4});
-  io.observe(document.querySelector(".metrics"));
+  // Run on view (graceful fallback if IntersectionObserver missing)
+  function runMetrics(){
+    const vals = document.querySelectorAll(".metric .val");
+    animateMetric(vals[0], -61.38, "%");
+    animateMetric(vals[1], 51.52, "%");
+  }
+  if (typeof IntersectionObserver !== "undefined"){
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting){ runMetrics(); io.disconnect(); }
+      });
+    }, {threshold:.4});
+    io.observe(document.querySelector(".metrics"));
+  } else {
+    runMetrics();
+  }
 </script>
 </body>
 </html>
