@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>腾讯 Agent Memory · 一页读懂</title>
+<style>
+  :root{
+    --bg:#fafaf7;
+    --ink:#1a1a1a;
+    --muted:#6b6b6b;
+    --line:#e6e3dc;
+    --card:#ffffff;
+    --accent:#2b6cb0;
+    --accent-soft:#e8f0fa;
+    --warm:#c47a3d;
+    --warm-soft:#fbf1e6;
+    --good:#3a7a4a;
+    --good-soft:#e8f3eb;
+    --dim:#f3f1ec;
+    --radius:14px;
+    --shadow:0 1px 0 rgba(0,0,0,.03), 0 8px 24px -16px rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    letter-spacing:.01em;
+  }
+  .wrap{max-width:880px;margin:0 auto;padding:64px 28px 120px}
+  .eyebrow{
+    display:inline-block;font-size:12px;letter-spacing:.18em;
+    color:var(--muted);text-transform:uppercase;margin-bottom:18px;
+  }
+  h1{font-size:38px;line-height:1.2;margin:0 0 16px;font-weight:600;letter-spacing:-.01em}
+  h1 .em{color:var(--accent)}
+  .lead{font-size:18px;color:#3a3a3a;max-width:640px;margin:0 0 8px}
+  .sub{color:var(--muted);font-size:14px}
+  section{margin-top:80px}
+  h2{
+    font-size:22px;font-weight:600;margin:0 0 8px;
+    display:flex;align-items:baseline;gap:12px;
+  }
+  h2 .n{
+    font-size:12px;color:var(--muted);font-weight:500;
+    letter-spacing:.18em;
+  }
+  .hint{color:var(--muted);font-size:14px;margin:0 0 24px}
+
+  /* metric cards */
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:8px}
+  .metric{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:18px 18px 16px;
+    transition:transform .25s ease, box-shadow .25s ease;
+    cursor:default;
+  }
+  .metric:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  .metric .label{font-size:12px;color:var(--muted);letter-spacing:.06em}
+  .metric .val{font-size:30px;font-weight:600;margin:6px 0 2px;letter-spacing:-.02em}
+  .metric .val.green{color:var(--good)}
+  .metric .val.warm{color:var(--warm)}
+  .metric .val.blue{color:var(--accent)}
+  .metric .delta{font-size:12px;color:var(--muted)}
+
+  /* idea row */
+  .pillars{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}
+  .pillar{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:22px;
+  }
+  .pillar h3{margin:0 0 6px;font-size:16px;font-weight:600}
+  .pillar p{margin:0;color:#444;font-size:14px}
+  .pillar .tag{
+    display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;
+    background:var(--accent-soft);color:var(--accent);margin-bottom:10px;letter-spacing:.04em;
+  }
+  .pillar.warm .tag{background:var(--warm-soft);color:var(--warm)}
+
+  /* pyramid */
+  .pyramid-card{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:28px;
+    display:grid;grid-template-columns:1.1fr 1fr;gap:36px;align-items:center;
+  }
+  .pyramid{display:flex;flex-direction:column;gap:8px;align-items:center}
+  .layer{
+    cursor:pointer;border:1px solid var(--line);
+    background:#fff;border-radius:10px;
+    padding:10px 14px;font-size:13px;
+    transition:all .2s ease;user-select:none;
+    text-align:center;
+  }
+  .layer:hover{border-color:#bcbcbc;background:#fdfcf9}
+  .layer.active{
+    background:var(--accent-soft);border-color:var(--accent);
+    color:var(--accent);font-weight:600;
+  }
+  .layer .lvl{font-size:11px;color:var(--muted);letter-spacing:.1em;margin-right:8px}
+  .layer.active .lvl{color:var(--accent)}
+  .layer.l3{width:38%}
+  .layer.l2{width:55%}
+  .layer.l1{width:74%}
+  .layer.l0{width:92%}
+  .pyramid-detail{min-height:160px}
+  .pyramid-detail h4{margin:0 0 6px;font-size:15px}
+  .pyramid-detail .role{font-size:12px;color:var(--muted);letter-spacing:.05em;margin-bottom:8px}
+  .pyramid-detail p{margin:0 0 8px;font-size:14px;color:#3a3a3a}
+  .pyramid-detail code{
+    background:var(--dim);padding:1px 6px;border-radius:4px;font-size:12px;
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  .pyramid-foot{font-size:12px;color:var(--muted);margin-top:18px;text-align:center}
+
+  /* compare (raw vs mermaid) */
+  .compare{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .compare-tabs{display:flex;border-bottom:1px solid var(--line);background:#fdfcf9}
+  .tab{
+    padding:12px 18px;font-size:13px;cursor:pointer;border:0;background:none;
+    color:var(--muted);position:relative;transition:color .15s;
+    font-family:inherit;
+  }
+  .tab.active{color:var(--ink);font-weight:600}
+  .tab.active::after{
+    content:"";position:absolute;left:18px;right:18px;bottom:-1px;height:2px;background:var(--accent);
+  }
+  .panel{padding:22px;font-size:13px}
+  .panel.hidden{display:none}
+  .raw{
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;
+    background:#f7f5f0;color:#666;
+    border-radius:8px;padding:14px;
+    white-space:pre-wrap;word-break:break-all;
+    max-height:240px;overflow:auto;font-size:12px;line-height:1.55;
+  }
+  .mmd{
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;
+    background:#eff6fb;color:#1e3a5f;
+    border-radius:8px;padding:14px;font-size:12.5px;line-height:1.7;
+  }
+  .mmd .arrow{color:var(--accent);font-weight:600}
+  .mmd .node{color:var(--warm);font-weight:600}
+  .stat{display:flex;gap:24px;margin-top:14px;font-size:12px;color:var(--muted)}
+  .stat b{color:var(--ink);font-size:14px;display:block;margin-bottom:2px}
+
+  /* drill down */
+  .drill{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:24px;
+  }
+  .drill-steps{display:flex;flex-direction:column;gap:0}
+  .step{
+    display:grid;grid-template-columns:80px 1fr;gap:18px;align-items:flex-start;
+    padding:14px 0;border-bottom:1px dashed var(--line);
+    cursor:pointer;transition:background .15s;
+    border-radius:6px;
+    padding-left:8px;
+  }
+  .step:last-child{border-bottom:none}
+  .step:hover{background:#fbf9f4}
+  .step .lvl{
+    font-size:11px;color:var(--accent);letter-spacing:.1em;
+    padding-top:4px;font-weight:600;
+  }
+  .step .body h4{margin:0 0 4px;font-size:14px;font-weight:600}
+  .step .body p{margin:0;font-size:13px;color:#555}
+  .step .body .ex{
+    margin-top:6px;font-size:12px;color:var(--muted);
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;
+    background:var(--dim);padding:4px 8px;border-radius:4px;
+    display:none;
+  }
+  .step.open .ex{display:inline-block}
+  .step .chev{
+    float:right;color:var(--muted);transition:transform .2s;
+    margin-left:8px;
+  }
+  .step.open .chev{transform:rotate(90deg)}
+
+  /* axes (three layering dimensions) */
+  .axes{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .axis{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:20px;
+    transition:border-color .2s;
+  }
+  .axis:hover{border-color:#cfcfcf}
+  .axis .icon{
+    width:32px;height:32px;border-radius:8px;margin-bottom:14px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;
+  }
+  .axis.a1 .icon{background:var(--accent-soft);color:var(--accent)}
+  .axis.a2 .icon{background:var(--good-soft);color:var(--good)}
+  .axis.a3 .icon{background:var(--warm-soft);color:var(--warm)}
+  .axis h3{margin:0 0 6px;font-size:15px}
+  .axis p{margin:0;font-size:13px;color:#555}
+
+  /* faq */
+  details{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:0;margin-bottom:10px;
+    overflow:hidden;
+  }
+  details[open]{box-shadow:var(--shadow)}
+  summary{
+    cursor:pointer;padding:16px 20px;font-size:14px;font-weight:500;
+    list-style:none;display:flex;justify-content:space-between;align-items:center;
+  }
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+";color:var(--muted);font-size:18px;transition:transform .2s}
+  details[open] summary::after{content:"−"}
+  details .ans{padding:0 20px 18px;color:#444;font-size:13.5px;line-height:1.7}
+
+  footer{margin-top:80px;color:var(--muted);font-size:12px;text-align:center}
+  footer a{color:var(--muted)}
+
+  @media (max-width:720px){
+    .wrap{padding:40px 20px 80px}
+    h1{font-size:28px}
+    .metrics,.pillars,.axes{grid-template-columns:1fr}
+    .pyramid-card{grid-template-columns:1fr;gap:24px}
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <span class="eyebrow">Tencent · Agent Memory</span>
+  <h1>让 Agent <span class="em">记住该记的</span>，<br>而不是把上下文塞满。</h1>
+  <p class="lead">腾讯的 Agent Memory 拒绝两件事：把历史一股脑堆进上下文，以及把它压缩成无法回溯的摘要。</p>
+  <p class="sub">阅读时间约 3 分钟 · 点击卡片可查看细节</p>
+
+  <!-- METRICS -->
+  <section>
+    <h2><span class="n">01</span> 它解决了什么问题</h2>
+    <p class="hint">在长会话里，Token 越堆越多，但 Agent 反而记不住关键。腾讯给出的实测：</p>
+    <div class="metrics">
+      <div class="metric">
+        <div class="label">Token 使用量</div>
+        <div class="val green">−61.38%</div>
+        <div class="delta">WideSearch · 短期记忆</div>
+      </div>
+      <div class="metric">
+        <div class="label">任务通过率</div>
+        <div class="val blue">+51.52%</div>
+        <div class="delta">WideSearch · 相对提升</div>
+      </div>
+      <div class="metric">
+        <div class="label">长期记忆准确率</div>
+        <div class="val warm">48% → 76%</div>
+        <div class="delta">PersonaMem · 跨会话</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TWO PILLARS -->
+  <section>
+    <h2><span class="n">02</span> 两个核心想法</h2>
+    <p class="hint">不是新发明的算法，而是两个工程哲学。</p>
+    <div class="pillars">
+      <div class="pillar">
+        <span class="tag">分层 · Layering</span>
+        <h3>记忆不应是平的</h3>
+        <p>把对话拆成四层金字塔：原文 → 原子事实 → 场景 → 画像。上层做判断，下层做证据，需要细节时再下钻。</p>
+      </div>
+      <div class="pillar warm">
+        <span class="tag">符号化 · Symbolic</span>
+        <h3>用最少的符号承载语义</h3>
+        <p>长任务的日志卸载到外部文件，上下文里只留一张 Mermaid 画布。Agent 读图，按 <code>node_id</code> 回查原文。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PYRAMID INTERACTIVE -->
+  <section>
+    <h2><span class="n">03</span> 长期记忆：L0 → L3 金字塔</h2>
+    <p class="hint">点击任意一层，查看它存什么、负责什么。</p>
+    <div class="pyramid-card">
+      <div class="pyramid" id="pyramid">
+        <div class="layer l3" data-l="3"><span class="lvl">L3</span>Persona · 画像</div>
+        <div class="layer l2" data-l="2"><span class="lvl">L2</span>Scenario · 场景</div>
+        <div class="layer l1" data-l="1"><span class="lvl">L1</span>Atom · 原子事实</div>
+        <div class="layer l0 active" data-l="0"><span class="lvl">L0</span>Conversation · 原文</div>
+      </div>
+      <div class="pyramid-detail" id="pyramidDetail">
+        <!-- filled by JS -->
+      </div>
+    </div>
+    <p class="pyramid-foot">↑ 越往上越抽象，越往下越精确。问"你喜欢什么"看 L3；问"上周三说了什么"下钻到 L0。</p>
+  </section>
+
+  <!-- COMPARE: raw vs mermaid -->
+  <section>
+    <h2><span class="n">04</span> 短期记忆：把日志换成一张图</h2>
+    <p class="hint">同一段任务状态，两种存法。切换看对比。</p>
+    <div class="compare">
+      <div class="compare-tabs">
+        <button class="tab active" data-tab="raw">原始日志（传统做法）</button>
+        <button class="tab" data-tab="mmd">Mermaid 画布（腾讯做法）</button>
+      </div>
+      <div class="panel" id="panel-raw">
+<div class="raw">[2025-05-14 09:12:03] tool_call: web_search(query="OpenAI o3 release notes")
+[2025-05-14 09:12:07] result: { "items":[{"title":"OpenAI o3 announcement…","url":"https://…","snippet":"On May 13 2025, OpenAI released…"}, … 47 more items …] }
+[2025-05-14 09:12:09] tool_call: fetch(url="https://openai.com/index/o3")
+[2025-05-14 09:12:11] result: "<html>… 18,000 tokens of HTML …</html>"
+[2025-05-14 09:12:14] tool_call: code_exec(lang="py", code="parse_release_notes(html)")
+[2025-05-14 09:12:15] error: ValueError("missing field 'date'") at parser.py:42
+[2025-05-14 09:12:18] tool_call: code_exec(lang="py", code="parse_release_notes(html, lenient=True)")
+[2025-05-14 09:12:19] result: { "date":"2025-05-13","model":"o3", … }
+…</div>
+<div class="stat">
+  <div><b>~120,000</b> tokens 在上下文里</div>
+  <div><b>0</b> 结构可言</div>
+  <div><b>难</b> 让 Agent 定位错误根因</div>
+</div>
+      </div>
+      <div class="panel hidden" id="panel-mmd">
+<div class="mmd">graph LR
+  <span class="node">n1</span>[搜索 o3 发布] <span class="arrow">--&gt;</span> <span class="node">n2</span>[抓取官网]
+  <span class="node">n2</span> <span class="arrow">--&gt;</span> <span class="node">n3</span>[解析]:::err
+  <span class="node">n3</span> <span class="arrow">--&gt;</span> <span class="node">n4</span>[宽松解析 ✓]
+  <span class="node">n4</span> <span class="arrow">--&gt;</span> <span class="node">n5</span>[输出: o3 / 2025-05-13]
+  classDef err stroke:#c47a3d,stroke-width:2px;</div>
+<div class="stat">
+  <div><b>~400</b> tokens 在上下文里</div>
+  <div><b>结构清晰</b>，状态可视</div>
+  <div>错误时按 <b>node_id</b> 下钻原文</div>
+</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- THREE AXES -->
+  <section>
+    <h2><span class="n">05</span> 同一套思路，三处复用</h2>
+    <p class="hint">分层不只是给"长期记忆"用，三个维度都按这个范式走。</p>
+    <div class="axes">
+      <div class="axis a1">
+        <div class="icon">◐</div>
+        <h3>短期上下文</h3>
+        <p>底层 <code>refs/*.md</code> 存原始工具输出；中层 JSONL 是步骤摘要；顶层 Mermaid 在上下文里。</p>
+      </div>
+      <div class="axis a2">
+        <div class="icon">◑</div>
+        <h3>长期个性化</h3>
+        <p>L0 对话 → L1 原子 → L2 场景 → L3 画像。日常用 Persona，需要细节时下钻。</p>
+      </div>
+      <div class="axis a3">
+        <div class="icon">◒</div>
+        <h3>技能生成</h3>
+        <p>从执行轨迹（Conversation）里提取解法（Scenario），再蒸馏出可复用的 Skill / SOP。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- DRILL DOWN -->
+  <section>
+    <h2><span class="n">06</span> 可下钻的链路</h2>
+    <p class="hint">压缩没让证据消失。任何抽象都能逐层走回原文。点击每一步展开示例。</p>
+    <div class="drill">
+      <div class="drill-steps" id="drillSteps">
+        <div class="step" data-key="persona">
+          <div class="lvl">L3</div>
+          <div class="body">
+            <h4>Persona <span class="chev">›</span></h4>
+            <p>用户偏好用 Mermaid 描述系统流程，回答时省略寒暄。</p>
+            <span class="ex">persona.md → "回答风格: 直接、视觉化"</span>
+          </div>
+        </div>
+        <div class="step" data-key="scenario">
+          <div class="lvl">L2</div>
+          <div class="body">
+            <h4>Scenario <span class="chev">›</span></h4>
+            <p>"系统设计讨论"场景块：5 次对话里都要求画图说明。</p>
+            <span class="ex">scenarios/2025-05-system-design.md</span>
+          </div>
+        </div>
+        <div class="step" data-key="atom">
+          <div class="lvl">L1</div>
+          <div class="body">
+            <h4>Atom <span class="chev">›</span></h4>
+            <p>原子事实：5 月 12 日用户说"能不能直接给我画个图"。</p>
+            <span class="ex">atoms.jsonl#L482</span>
+          </div>
+        </div>
+        <div class="step" data-key="conv">
+          <div class="lvl">L0</div>
+          <div class="body">
+            <h4>Conversation <span class="chev">›</span></h4>
+            <p>原始对话片段，完整保留时间戳、上下文、上下文话术。</p>
+            <span class="ex">conversations/2025-05-12.md</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section>
+    <h2><span class="n">07</span> 常见疑问</h2>
+    <p class="hint">三个最容易混淆的点。</p>
+    <details>
+      <summary>为什么不直接用向量库？</summary>
+      <div class="ans">向量库把记忆"摊平"成一堆碎片，召回时只能盲搜，没有宏观结构。腾讯的做法是先建金字塔（Persona/Scenario 给方向），再下钻到向量层取证据 —— 检索从"撞概率"变成"按路径走"。</div>
+    </details>
+    <details>
+      <summary>Mermaid 不是给人看的吗？为什么 Agent 也能读？</summary>
+      <div class="ans">Mermaid 语法简洁、节点关系明确，对 LLM 来说比 JSON 更省 token、比自然语言更结构化。一张图既能给人看，也能直接进上下文。它是"高密度、低歧义"的中间表示。</div>
+    </details>
+    <details>
+      <summary>L3 Persona 万一错了怎么办？</summary>
+      <div class="ans">所有上层都不是黑盒：Persona 是 Markdown 文件，能直接打开看；每条画像都能追溯到生成它的 Scenario 和 Atom。调试不再是"猜向量分数"，而是沿着 Persona → Scenario → Atom → Conversation 走一遍。</div>
+    </details>
+  </section>
+
+  <footer>
+    一页读懂 · 基于 <a href="https://github.com/Tencent/TencentDB-Agent-Memory" target="_blank" rel="noopener">TencentDB Agent Memory</a> 官方文档整理
+  </footer>
+
+</main>
+
+<script>
+  // ---- pyramid ----
+  const PYRAMID = {
+    "3": {
+      title:"L3 · Persona（画像）",
+      role:"顶层 · 抽象 · 给方向",
+      desc:"用户的长期偏好、风格、目标。日常对话先看这一层。",
+      ex:"persona.md（Markdown，可白盒检查）"
+    },
+    "2": {
+      title:"L2 · Scenario（场景）",
+      role:"中上层 · 半结构 · 主题聚合",
+      desc:"把相关原子事实聚合成一个个『场景块』。例如「2025-Q2 产品设计讨论」。",
+      ex:"scenarios/*.md"
+    },
+    "1": {
+      title:"L1 · Atom（原子事实）",
+      role:"中下层 · 结构化条目",
+      desc:"从对话中抽取的可复用的最小事实单元，自带去重和冲突检测。",
+      ex:"atoms.jsonl（带向量索引）"
+    },
+    "0": {
+      title:"L0 · Conversation（原文）",
+      role:"底层 · 原始证据",
+      desc:"完整保留的对话原文，所有上层抽象的最终回溯点。",
+      ex:"conversations/*.md"
+    }
+  };
+  function renderPyramid(level){
+    const d = PYRAMID[level];
+    const el = document.getElementById("pyramidDetail");
+    el.innerHTML = `
+      <div class="role">${d.role}</div>
+      <h4>${d.title}</h4>
+      <p>${d.desc}</p>
+      <p><code>${d.ex}</code></p>`;
+    document.querySelectorAll("#pyramid .layer").forEach(l => {
+      l.classList.toggle("active", l.dataset.l === level);
+    });
+  }
+  document.querySelectorAll("#pyramid .layer").forEach(l => {
+    l.addEventListener("click", () => renderPyramid(l.dataset.l));
+  });
+  renderPyramid("0");
+
+  // ---- compare tabs ----
+  document.querySelectorAll(".tab").forEach(t => {
+    t.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+      t.classList.add("active");
+      const which = t.dataset.tab;
+      document.getElementById("panel-raw").classList.toggle("hidden", which !== "raw");
+      document.getElementById("panel-mmd").classList.toggle("hidden", which !== "mmd");
+    });
+  });
+
+  // ---- drill steps ----
+  document.querySelectorAll("#drillSteps .step").forEach(s => {
+    s.addEventListener("click", () => s.classList.toggle("open"));
+  });
+
+  // ---- metric count-up (subtle) ----
+  function animateMetric(el, target, suffix, isPair){
+    if (isPair) return; // 跳过 48% → 76% 这种
+    const dur = 700;
+    const start = performance.now();
+    const sign = target < 0 ? "-" : (suffix === "%" && !el.textContent.includes("−") ? "+" : "");
+    const abs = Math.abs(target);
+    function tick(now){
+      const p = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const v = (abs * eased).toFixed(abs < 10 ? 1 : (abs % 1 ? 2 : 0));
+      el.textContent = (target < 0 ? "−" : "+") + v + suffix;
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    el.textContent = (target < 0 ? "−" : "+") + "0" + suffix;
+    requestAnimationFrame(tick);
+  }
+  // Run on view (graceful fallback if IntersectionObserver missing)
+  function runMetrics(){
+    const vals = document.querySelectorAll(".metric .val");
+    animateMetric(vals[0], -61.38, "%");
+    animateMetric(vals[1], 51.52, "%");
+  }
+  if (typeof IntersectionObserver !== "undefined"){
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting){ runMetrics(); io.disconnect(); }
+      });
+    }, {threshold:.4});
+    io.observe(document.querySelector(".metrics"));
+  } else {
+    runMetrics();
+  }
+</script>
+</body>
+</html>
